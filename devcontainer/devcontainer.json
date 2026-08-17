@@ -1,0 +1,15 @@
+{
+  "name": "IA Local - Dois Agentes",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "containerEnv": {
+    "OLLAMA_MODELS": "/workspaces/.ollama-models",
+    "OLLAMA_ORIGINS": "*"
+  },
+  "postCreateCommand": "mkdir -p /workspaces/.ollama-models && curl -fsSL https://ollama.com/install.sh | sh && (ollama serve &) && sleep 5 && ollama pull phi3:mini && ollama pull qwen2.5-coder:1.5b",
+  "postStartCommand": "mkdir -p /workspaces/.ollama-models && (pgrep -f 'ollama serve' || ollama serve &) && sleep 3",
+  "forwardPorts": [8000, 11434],
+  "portsAttributes": {
+    "11434": { "label": "Ollama API", "onAutoForward": "silent" },
+    "8000": { "label": "Interface Web", "onAutoForward": "openBrowser" }
+  }
+}

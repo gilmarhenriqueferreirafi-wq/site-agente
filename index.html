@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IA Local · Dois Agentes</title>
+<style>
+  :root{
+    --bg: #14161a;
+    --panel: #1b1e24;
+    --border: #2a2e37;
+    --text: #e7e9ee;
+    --text-dim: #8b90a0;
+    --agent-general: #4fb3ff;
+    --agent-coder: #f2a641;
+    --accent: var(--agent-general);
+    --accent-dim: color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%; margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', ui-monospace, Menlo, Consolas, monospace;
+  }
+  body[data-agent="coder"] { --accent: var(--agent-coder); }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 820px;
+    margin: 0 auto;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+
+  header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .title {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .title b { color: var(--text); }
+
+  .switch {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .switch button {
+    appearance: none; border: none; background: transparent;
+    color: var(--text-dim);
+    padding: 8px 14px;
+    font: inherit;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .switch button .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .switch button.active {
+    color: var(--text);
+    background: var(--accent-dim);
+  }
+  .switch button.active .dot { background: var(--accent); }
+  .switch button:not(.active):hover { color: var(--text); }
+
+  .status {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .status .led {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #555;
+  }
+  .status .led.ok { background: #4ade80; }
+  .status .led.err { background: #f87171; }
+
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .empty {
+    margin: auto;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    max-width: 340px;
+    line-height: 1.6;
+  }
+  .empty .agent-name { color: var(--accent); }
+
+  .msg {
+    display: flex;
+    gap: 10px;
+    max-width: 90%;
+  }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .msg .bubble {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .msg.user .bubble {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .msg.assistant .bubble {
+    background: var(--panel);
+    border: 1px solid var(--border);
+  }
+  .msg .tag {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  .bubble code {
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+  .bubble pre {
+    background: #0e1013;
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 6px 0;
+  }
+  .bubble pre code { background: none; padding: 0; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 14px 18px;
+    display: flex;
+    gap: 10px;
+  }
+  textarea {
+    flex: 1;
+    resize: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 13.5px;
+    line-height: 1.4;
+    max-height: 140px;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  button.send {
+    appearance: none; border: none;
+    background: var(--accent);
+    color: #0e1013;
+    font: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 0 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  button.send:disabled { opacity: 0.4; cursor: default; }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body data-agent="general">
+<div class="app">
+
+  <header>
+    <div class="title">IA Local · <b id="agentLabel">Assistente Geral</b></div>
+    <div class="switch" id="switch">
+      <button class="active" data-agent="general" data-model="phi3:mini">
+        <span class="dot"></span> Geral
+      </button>
+      <button data-agent="coder" data-model="qwen2.5-coder:7b">
+        <span class="dot"></span> Coder
+      </button>
+    </div>
+    <div class="status"><span class="led" id="led"></span><span id="statusText">verificando...</span></div>
+  </header>
+
+  <main id="chat">
+    <div class="empty" id="emptyState">
+      Conversa vazia.<br>
+      Agente ativo: <span class="agent-name" id="emptyAgentName">Assistente Geral</span><br>
+      Escreva algo abaixo pra começar.
+    </div>
+  </main>
+
+  <footer>
+    <textarea id="input" placeholder="Digite sua mensagem..." rows="1"></textarea>
+    <button class="send" id="sendBtn">Enviar</button>
+  </footer>
+
+</div>
+
+<script>
+// Descobre a URL certa do Ollama: em localhost normal usa 11434 direto.
+// No Codespaces (URL tipo nome-8000.app.github.dev), troca a porta no host
+// pra apontar pro túnel da 11434, senão "localhost" no navegador não
+// chega no Ollama que está rodando dentro do Codespace.
+function getOllamaBase() {
+  const host = window.location.hostname;
+  const portMatch = host.match(/^(.*)-(\d+)\.app\.github\.dev$/);
+  if (portMatch) {
+    return `${window.location.protocol}//${portMatch[1]}-11434.app.github.dev`;
+  }
+  return "http://localhost:11434";
+}
+const OLLAMA_BASE = getOllamaBase();
+const OLLAMA_URL = OLLAMA_BASE + "/api/chat";
+
+const AGENTS = {
+  general: {
+    model: "phi3:mini",
+    label: "Assistente Geral",
+    systemPrompt: "Você é um assistente pessoal, sempre responda em português do Brasil, independente do idioma da pergunta. Seja direto, prático e amigável nas respostas, sem enrolação. Quando não souber algo com certeza, admita em vez de inventar."
+  },
+  coder: {
+    model: "qwen2.5-coder:1.5b",
+    label: "Assistente Coder",
+    systemPrompt: "Você é um assistente de programação, sempre responda em português do Brasil, independente do idioma da pergunta (mas mantenha código, nomes de variáveis e termos técnicos em inglês, como é padrão). Seja direto e técnico, priorize exemplos de código funcionais e explique decisões importantes de forma breve. Evite explicações longas quando o código já for autoexplicativo."
+  }
+};
+
+let currentAgent = "general";
+// histórico separado por agente, pra cada um manter seu próprio contexto
+let histories = { general: [], coder: [] };
+
+const chatEl = document.getElementById("chat");
+const emptyState = document.getElementById("emptyState");
+const emptyAgentName = document.getElementById("emptyAgentName");
+const agentLabel = document.getElementById("agentLabel");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("sendBtn");
+const led = document.getElementById("led");
+const statusText = document.getElementById("statusText");
+
+document.querySelectorAll("#switch button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#switch button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentAgent = btn.dataset.agent;
+    document.body.dataset.agent = currentAgent;
+    agentLabel.textContent = AGENTS[currentAgent].label;
+    emptyAgentName.textContent = AGENTS[currentAgent].label;
+    renderHistory();
+  });
+});
+
+function renderHistory(){
+  chatEl.querySelectorAll(".msg").forEach(m => m.remove());
+  const hist = histories[currentAgent];
+  emptyState.style.display = hist.length ? "none" : "flex";
+  hist.forEach(m => appendBubble(m.role, m.content, false));
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function appendBubble(role, content, scroll = true){
+  emptyState.style.display = "none";
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  const tag = role === "user" ? "Você" : AGENTS[currentAgent].label;
+  div.innerHTML = `<div class="bubble"><span class="tag">${tag}</span>${escapeHtml(content)}</div>`;
+  chatEl.appendChild(div);
+  if (scroll) chatEl.scrollTop = chatEl.scrollHeight;
+  return div.querySelector(".bubble");
+}
+
+function escapeHtml(str){
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML.replace(/```([\s\S]*?)```/g, (m, c) => `<pre><code>${c}</code></pre>`);
+}
+
+async function checkStatus(){
+  try {
+    const res = await fetch(OLLAMA_BASE + "/api/tags");
+    if (res.ok) {
+      led.classList.add("ok"); led.classList.remove("err");
+      statusText.textContent = "ollama conectado";
+    } else throw new Error();
+  } catch {
+    led.classList.add("err"); led.classList.remove("ok");
+    statusText.textContent = "ollama offline";
+  }
+}
+checkStatus();
+setInterval(checkStatus, 10000);
+
+input.addEventListener("input", () => {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 140) + "px";
+});
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+sendBtn.addEventListener("click", send);
+
+async function send(){
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  input.style.height = "auto";
+  sendBtn.disabled = true;
+
+  histories[currentAgent].push({ role: "user", content: text });
+  appendBubble("user", text);
+
+  const bubble = appendBubble("assistant", "");
+  bubble.textContent = "...";
+
+  try {
+    const res = await fetch(OLLAMA_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: AGENTS[currentAgent].model,
+        messages: [
+          { role: "system", content: AGENTS[currentAgent].systemPrompt },
+          ...histories[currentAgent]
+        ],
+        stream: true
+      })
+    });
+
+    if (!res.ok || !res.body) throw new Error("Falha na requisição ao Ollama");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = "";
+    bubble.textContent = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      chunk.split("\n").filter(Boolean).forEach(line => {
+        try {
+          const json = JSON.parse(line);
+          if (json.message && json.message.content) {
+            full += json.message.content;
+            bubble.textContent = full;
+            chatEl.scrollTop = chatEl.scrollHeight;
+          }
+        } catch {}
+      });
+    }
+
+    histories[currentAgent].push({ role: "assistant", content: full });
+  } catch (err) {
+    bubble.textContent = "Erro ao conectar no Ollama. Confirme que 'ollama serve' está rodando (porta 11434).";
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
